@@ -1,0 +1,23 @@
+# Go binaries and build artifacts
+/yacs
+/yacs.exe
+/bin/
+dist/
+build/
+*.out
+*.test
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# TLS certificates and private keys
+*.key
+*.pem
+compose/certs/
+
+# Editor and operating system files
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,51 @@
+directives:
+  child-src:
+    - "'self'"
+
+  connect-src:
+    - "'self'"
+    - "blob:"
+    - "https://raw.githubusercontent.com/owncloud/awesome-ocis/"
+    - "https://marketplace.owncloud.com/"
+
+  default-src:
+    - "'none'"
+
+  font-src:
+    - "'self'"
+    - "data:"
+
+  frame-ancestors:
+    - "'self'"
+
+  frame-src:
+    - "'self'"
+    - "blob:"
+    - "https://embed.diagrams.net/"
+    - "https://${ONLYOFFICE_DOMAIN|onlyoffice.owncloud.test}/"
+
+  img-src:
+    - "'self'"
+    - "data:"
+    - "blob:"
+    - "https://raw.githubusercontent.com/owncloud/awesome-ocis/"
+    - "https://marketplace.owncloud.com/"
+    - "https://${ONLYOFFICE_DOMAIN|onlyoffice.owncloud.test}/"
+
+  manifest-src:
+    - "'self'"
+
+  media-src:
+    - "'self'"
+
+  object-src:
+    - "'self'"
+    - "blob:"
+
+  script-src:
+    - "'self'"
+    - "'unsafe-inline'"
+
+  style-src:
+    - "'self'"
+    - "'unsafe-inline'"

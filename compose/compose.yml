@@ -1,0 +1,113 @@
+name: personal-cloud
+
+services:
+  ocis:
+    image: owncloud/ocis:${OCIS_VERSION:-8.2.1}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["if [ ! -f /etc/ocis/ocis.yaml ]; then ocis init --insecure yes; fi; exec ocis server"]
+    environment:
+      PROXY_CSP_CONFIG_FILE_LOCATION: /etc/ocis/csp.yaml
+      ONLYOFFICE_DOMAIN: ${PUBLIC_HOST}:9981
+      MICRO_REGISTRY: nats-js-kv
+      MICRO_REGISTRY_ADDRESS: "0.0.0.0:9233"
+      GATEWAY_GRPC_ADDR: "0.0.0.0:9142"
+      NATS_NATS_HOST: "0.0.0.0"
+      NATS_NATS_PORT: "9233"
+      OCIS_URL: "https://${PUBLIC_HOST:-localhost}:9200"
+      OCIS_INSECURE: "true"
+      OCIS_JWT_SECRET: "${OCIS_JWT_SECRET:?Run yacs install to create the configuration}"
+      IDM_ADMIN_PASSWORD: "${IDM_ADMIN_PASSWORD:?Run yacs install to create the configuration}"
+      PROXY_HTTP_ADDR: "0.0.0.0:9200"
+      PROXY_TLS: "true"
+      PROXY_TRANSPORT_TLS_CERT: /etc/ocis/certs/server.crt
+      PROXY_TRANSPORT_TLS_KEY: /etc/ocis/certs/server.key
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:9200:9200"
+    volumes:
+      - {{.CSPPath}}:/etc/ocis/csp.yaml:ro
+      - ocis-config:/etc/ocis
+      - ocis-data:/var/lib/ocis
+      - {{.CertificateDir}}:/etc/ocis/certs:ro
+    networks:
+      - cloud-internal
+
+{{if .IncludeOnlyOffice}}
+  onlyoffice:
+    image: onlyoffice/documentserver:${ONLYOFFICE_VERSION:-9.2.1}
+    restart: unless-stopped
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: "${ONLYOFFICE_JWT_SECRET:?Run yacs install to create the configuration}"
+      JWT_HEADER: Authorization
+      WOPI_ENABLED: "true"
+      USE_UNAUTHORIZED_STORAGE: "true"
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+      SSL_CERTIFICATE_PATH: /var/www/onlyoffice/Data/certs/tls.crt
+      SSL_KEY_PATH: /var/www/onlyoffice/Data/certs/tls.key
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:9981:443"
+    volumes:
+      - onlyoffice-data:/var/www/onlyoffice/Data
+      - onlyoffice-logs:/var/log/onlyoffice
+      - onlyoffice-lib:/var/lib/onlyoffice
+      - onlyoffice-db:/var/lib/postgresql
+      - {{.CertificateDir}}/server.crt:/var/www/onlyoffice/Data/certs/tls.crt:ro
+      - {{.CertificateDir}}/server.key:/var/www/onlyoffice/Data/certs/tls.key:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/hosting/discovery", "-o", "/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    networks:
+      - cloud-internal
+
+  collaboration:
+    image: owncloud/ocis:${OCIS_VERSION:-8.2.1}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["exec ocis collaboration server"]
+    depends_on:
+      ocis:
+        condition: service_started
+      onlyoffice:
+        condition: service_healthy
+    environment:
+      OCIS_URL: "https://${PUBLIC_HOST:-localhost}:9200"
+      OCIS_INSECURE: "true"
+      OCIS_JWT_SECRET: "${OCIS_JWT_SECRET:?Run yacs install to create the configuration}"
+      COLLABORATION_WOPI_SECRET: "${COLLABORATION_WOPI_SECRET:?Run yacs install to create the configuration}"
+      OCIS_REVA_GATEWAY: com.owncloud.api.gateway
+      MICRO_REGISTRY: nats-js-kv
+      MICRO_REGISTRY_ADDRESS: ocis:9233
+      COLLABORATION_GRPC_ADDR: 0.0.0.0:9303
+      COLLABORATION_HTTP_ADDR: 0.0.0.0:9302
+      COLLABORATION_APP_NAME: OnlyOffice
+      COLLABORATION_APP_PRODUCT: OnlyOffice
+      COLLABORATION_APP_ADDR: "https://${PUBLIC_HOST:-localhost}:9981"
+      COLLABORATION_APP_ICON: "https://${PUBLIC_HOST:-localhost}:9981/web-apps/apps/documenteditor/main/resources/img/favicon.ico"
+      COLLABORATION_APP_INSECURE: "true"
+      COLLABORATION_CS3API_DATAGATEWAY_INSECURE: "true"
+      COLLABORATION_WOPI_SRC: "http://collaboration:9302"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:9302:9302"
+    volumes:
+      - ocis-config:/etc/ocis
+      - {{.CertificateDir}}:/etc/ocis/certs:ro
+    networks:
+      - cloud-internal
+
+{{end}}
+networks:
+  cloud-internal:
+    name: personal-cloud-internal
+    driver: bridge
+
+volumes:
+  ocis-config:
+  ocis-data:
+  onlyoffice-data:
+  onlyoffice-logs:
+  onlyoffice-lib:
+  onlyoffice-db:
