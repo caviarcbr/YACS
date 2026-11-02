@@ -1,0 +1,31 @@
+version: 2
+
+project_name: yacs
+
+
+builds:
+  - id: yacs
+    main: ./cmd/yacs
+    binary: yacs
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/caviarcbr/YACS/internal/cli.AppVersion={{.Version}}
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: "yacs_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  github:
+    owner: caviarcbr
+    name: YACS

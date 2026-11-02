@@ -1,6 +1,5 @@
 package cli
 
-const (
-	AppName    = "YACS"
-	AppVersion = "0.1.0"
-)
+var AppVersion = "0.1.0"
+
+const AppName = "YACS"
