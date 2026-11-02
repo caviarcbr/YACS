@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+var ErrSudoAuthenticationRequired = errors.New(
+	"Docker requires sudo authentication",
+)
+
 // Client represents the Docker command-line client.
 type Client struct {
 	Binary string
@@ -91,6 +95,64 @@ func (c *Client) Preflight(ctx context.Context, notice io.Writer) error {
 	if _, err := c.ServerVersion(ctx); err != nil {
 		c.Sudo = false
 		return fmt.Errorf("Docker daemon is not reachable with sudo: %w", err)
+	}
+
+	return nil
+}
+
+// PreflightTUI checks Docker access without prompting in the terminal.
+// It returns ErrSudoAuthenticationRequired when the TUI needs to ask
+// the user for their sudo password.
+func (c *Client) PreflightTUI(ctx context.Context) error {
+	_, err := c.ServerVersion(ctx)
+	if err == nil {
+		return nil
+	}
+
+	if !isPermissionDenied(err) {
+		return fmt.Errorf("Docker daemon is not reachable: %w", err)
+	}
+
+	sudoPath, err := exec.LookPath("sudo")
+	if err != nil {
+		return errors.New(
+			"Docker permission denied and sudo is not installed",
+		)
+	}
+
+	check := exec.CommandContext(ctx, sudoPath, "-n", "-v")
+	check.Stdout = io.Discard
+	check.Stderr = io.Discard
+
+	if err := check.Run(); err != nil {
+		return ErrSudoAuthenticationRequired
+	}
+
+	c.Sudo = true
+
+	if _, err := c.ServerVersion(ctx); err != nil {
+		c.Sudo = false
+		return fmt.Errorf("Docker daemon is not reachable with sudo: %w", err)
+	}
+
+	return nil
+}
+
+// AuthenticateSudo validates a password and caches sudo credentials.
+// The password is passed through stdin, never as a command-line argument.
+func (c *Client) AuthenticateSudo(ctx context.Context, password string) error {
+	sudoPath, err := exec.LookPath("sudo")
+	if err != nil {
+		return fmt.Errorf("sudo is not installed: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, sudoPath, "-S", "-p", "", "-v")
+	cmd.Stdin = strings.NewReader(password + "\n")
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		return errors.New("sudo authentication failed; check your password")
 	}
 
 	return nil

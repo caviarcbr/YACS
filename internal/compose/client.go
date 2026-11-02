@@ -140,6 +140,41 @@ func (c *Client) InstallStream(
 	return nil
 }
 
+// InstallQuiet performs an installation without streaming Docker progress output.
+// Stage messages are still reported through progress.
+func (c *Client) InstallQuiet(
+    ctx context.Context,
+    progress func(string),
+) error {
+    output := io.Discard
+
+    if progress != nil {
+        progress("Validating Compose configuration...")
+    }
+
+    if err := c.Validate(ctx); err != nil {
+        return fmt.Errorf("validating Compose configuration: %w", err)
+    }
+
+    if progress != nil {
+        progress("Pulling Docker images...")
+    }
+
+    if err := c.PullStream(ctx, output); err != nil {
+        return fmt.Errorf("pulling Docker images: %w", err)
+    }
+
+    if progress != nil {
+        progress("Starting services...")
+    }
+
+    if err := c.UpStream(ctx, output); err != nil {
+        return fmt.Errorf("starting services: %w", err)
+    }
+
+    return nil
+}
+
 // UpStream starts the Compose deployment and streams Docker output.
 func (c *Client) UpStream(ctx context.Context, output io.Writer) error {
 	if runner, ok := c.Docker.(StreamingDockerRunner); ok {

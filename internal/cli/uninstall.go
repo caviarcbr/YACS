@@ -11,6 +11,7 @@ import (
 
 	"github.com/caviarcbr/YACS/internal/compose"
 	"github.com/caviarcbr/YACS/internal/config"
+	"github.com/caviarcbr/YACS/internal/docker"
 )
 
 func runUninstall(
@@ -37,8 +38,7 @@ func runUninstall(
 	}
 
 	answer = strings.TrimSpace(answer)
-	if !strings.EqualFold(answer, "y") &&
-		!strings.EqualFold(answer, "yes") {
+	if !strings.EqualFold(answer, "y") && !strings.EqualFold(answer, "yes") {
 		fmt.Fprintln(output, "Uninstallation cancelled.")
 		return nil
 	}
@@ -57,6 +57,72 @@ func runUninstall(
 		}
 	}
 
+	return UninstallConfigured(configPath, removeData, output)
+}
+
+// UninstallConfigured removes the YACS Compose deployment.
+// When removeData is true, named Docker volumes and YACS-managed files
+// are also removed.
+func UninstallConfigured(
+	configPath string,
+	removeData bool,
+	output io.Writer,
+) error {
+	return uninstallConfigured(
+		configPath,
+		removeData,
+		output,
+		func() (*docker.Client, error) {
+			dockerClient, err := docker.NewClient()
+			if err != nil {
+				return nil, fmt.Errorf("initializing Docker client: %w", err)
+			}
+
+			if err := dockerClient.Preflight(context.Background(), os.Stderr); err != nil {
+				return nil, fmt.Errorf("Docker preflight failed: %w", err)
+			}
+
+			return dockerClient, nil
+		},
+	)
+}
+
+// UninstallConfiguredForTUI runs the uninstall workflow after the TUI
+// has completed Docker authentication.
+func UninstallConfiguredForTUI(
+	configPath string,
+	removeData bool,
+	output io.Writer,
+) error {
+	return uninstallConfigured(
+		configPath,
+		removeData,
+		output,
+		func() (*docker.Client, error) {
+			dockerClient, err := docker.NewClient()
+			if err != nil {
+				return nil, fmt.Errorf("initializing Docker client: %w", err)
+			}
+
+			if err := dockerClient.PreflightTUI(context.Background()); err != nil {
+				return nil, fmt.Errorf("Docker preflight failed: %w", err)
+			}
+
+			return dockerClient, nil
+		},
+	)
+}
+
+func uninstallConfigured(
+	configPath string,
+	removeData bool,
+	output io.Writer,
+	prepareDocker func() (*docker.Client, error),
+) error {
+	if output == nil {
+		output = io.Discard
+	}
+
 	configFile, err := config.ResolveConfigFile(configPath)
 	if err != nil {
 		return err
@@ -73,7 +139,10 @@ func runUninstall(
 	}
 
 	if len(deployments) == 0 {
-		return fmt.Errorf("no YACS deployment found in %s; nothing was removed", paths.ComposeDir)
+		return fmt.Errorf(
+			"no YACS deployment found in %s; nothing was removed",
+			paths.ComposeDir,
+		)
 	}
 
 	if len(deployments) > 1 {
@@ -95,12 +164,21 @@ func runUninstall(
 		}
 	}
 
-	fmt.Fprintf(output, "\nUninstalling deployment %q...\n", deployment.Name)
-
-	client, err := newDeploymentClient(configPath, &deployment)
+	dockerClient, err := prepareDocker()
 	if err != nil {
 		return err
 	}
+
+	client, err := newDeploymentClientWithDocker(
+		paths,
+		&deployment,
+		dockerClient,
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(output, "\nUninstalling deployment %q...\n", deployment.Name)
 
 	if err := client.Uninstall(context.Background(), removeData); err != nil {
 		return err

@@ -34,6 +34,14 @@ func newDeploymentClient(
 		return nil, fmt.Errorf("Docker preflight failed: %w", err)
 	}
 
+	return newDeploymentClientWithDocker(paths, deployment, dockerClient)
+}
+
+func newDeploymentClientWithDocker(
+	paths config.Paths,
+	deployment *compose.Deployment,
+	dockerClient *docker.Client,
+) (*compose.Client, error) {
 	composeClient, err := compose.NewClient(
 		dockerClient,
 		deployment.ComposeFile,
