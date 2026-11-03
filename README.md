@@ -28,6 +28,47 @@ Go is only required if building YACS from source.
 
 ## Installation
 
+YACS can be installed using a prebuilt binary or built from source.
+
+### Download a release binary
+
+Prebuilt Linux binaries are available from the [YACS GitHub Releases](https://github.com/caviarcbr/YACS/releases/latest) page.
+
+1. Open the latest release.
+2. Download the archive matching your system architecture:
+   - `linux_amd64` — most Intel and AMD 64-bit systems.
+   - `linux_arm64` — 64-bit ARM systems.
+3. Download `checksums.txt` from the same release if you want to verify the archive.
+
+Extract the downloaded archive:
+
+```bash
+tar -xzf yacs_VERSION_linux_ARCH.tar.gz
+```
+
+Replace `VERSION` and `ARCH` with the version and architecture in the downloaded filename.
+
+Optionally, verify the archive checksum from the directory containing `checksums.txt`:
+
+```bash
+sha256sum -c <(grep 'yacs_VERSION_linux_ARCH.tar.gz$' checksums.txt)
+```
+
+Install the executable:
+
+```bash
+mkdir -p ~/.local/bin
+install -Dm755 yacs ~/.local/bin/yacs
+```
+
+Make sure `~/.local/bin` is included in your `PATH`. You can then launch YACS with:
+
+```bash
+yacs
+```
+
+### Build from source
+
 Clone the repository and build YACS:
 
 ```bash
@@ -44,9 +85,29 @@ Run the executable:
 
 ## Usage
 
-### Install
+### Interactive TUI
 
-Start the interactive installation:
+Running YACS without arguments launches the interactive terminal interface:
+
+```bash
+yacs
+```
+
+The main menu provides three options:
+
+- **Install** — Start a new installation and choose whether to include ONLYOFFICE.
+- **Restore** — Restore an existing installation using its saved configuration, certificates, credentials, and Docker volumes.
+- **Uninstall** — Remove the running services while preserving their configuration and data, or remove the installation completely.
+
+Follow the on-screen prompts to navigate the available options.
+
+### CLI commands
+
+YACS also supports command-line operations without launching the interactive interface.
+
+#### Install
+
+Start the installation:
 
 ```bash
 yacs install
@@ -58,7 +119,7 @@ YACS will generate the required configuration, create TLS certificates, and depl
 
 If an existing installation is detected, YACS can restore it using its existing configuration and data.
 
-### Uninstall
+#### Uninstall
 
 Remove the running services while keeping your configuration and data:
 
@@ -66,7 +127,7 @@ Remove the running services while keeping your configuration and data:
 yacs uninstall
 ```
 
-You can restore the installation later by running `yacs install` again.
+You can restore the installation later by running `yacs install` again, or selecting **Restore** from the interactive menu.
 
 To remove the installation and its associated data:
 
@@ -76,10 +137,14 @@ yacs uninstall --remove-data
 
 **Warning:** This permanently deletes the YACS-managed installation data. Back up anything you want to keep before proceeding.
 
-### Other commands
+#### Other commands
 
 | Command | Description |
 |---|---|
+| `yacs` | Launch the interactive interface |
+| `yacs install` | Install or resume an installation |
+| `yacs uninstall` | Uninstall while preserving data |
+| `yacs uninstall --remove-data` | Uninstall and remove installation data |
 | `yacs version` | Display version information |
 | `yacs help` | Display available commands |
 
